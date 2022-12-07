@@ -1,6 +1,5 @@
 -- Liberação p/ Produção -- 
 
-
 CREATE PROCEDURE SP_SPS_LAYOUT_LIB_PROD (
 
 IN DocKey int
@@ -16,7 +15,7 @@ SELECT
 	T0."CardCode" AS "CódCliente",
 	T0."CardType" AS "TipoPN",
 	T1."U_DocDate" AS "Data",
-	
+	T1."U_Acabamento" AS "Acabamento",
 	--T1."U_Status" AS "Status",-
 	
 	CASE 
@@ -35,3 +34,4 @@ WHERE T0."CardType" = 'C' AND T1."DocEntry" = :DocKey
 ORDER BY T1."U_DocDate" ASC;
 
 END;
+
