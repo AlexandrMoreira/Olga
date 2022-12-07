@@ -1,0 +1,37 @@
+-- Liberação p/ Produção -- 
+
+
+CREATE PROCEDURE SP_SPS_LAYOUT_LIB_PROD (
+
+IN DocKey int
+
+)
+
+AS
+BEGIN
+
+SELECT 
+
+	T0."CardName" AS "NomeDoCliente",
+	T0."CardCode" AS "CódCliente",
+	T0."CardType" AS "TipoPN",
+	T1."U_DocDate" AS "Data",
+	
+	--T1."U_Status" AS "Status",-
+	
+	CASE 
+	WHEN T1."U_Status" = '6' THEN 'Produção'
+	ELSE 'Não Liberado'
+	END AS "Status"
+	
+	
+FROM OCRD T0
+
+INNER JOIN "@SPS_RMIND_CAB" T1 ON T0."CardCode" = T1."U_CardCode"
+
+	
+WHERE T0."CardType" = 'C' AND T1."DocEntry" = :DocKey
+
+ORDER BY T1."U_DocDate" ASC;
+
+END;
