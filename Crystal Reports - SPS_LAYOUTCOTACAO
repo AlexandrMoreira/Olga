@@ -1,0 +1,78 @@
+-- Cotação de Vendas -- 
+
+CREATE PROCEDURE SPS_LAYOUTCOTACAO (IN DocKey NVARCHAR(10)) LANGUAGE SQLSCRIPT AS
+--DO
+BEGIN
+
+--DECLARE DocKey int := 54; 
+
+SELECT 
+	  T0."DocNum" 
+	, T0."U_CardCode" "Código do Cliente"
+	, T0."U_CardName" "Nome do Cliente"
+	, T0."U_Mesa" "Mesa"
+	, T0."U_Origem" "Origem"
+	, T0."U_TipoVenda" "Tipo de Venda"
+	, T0."U_Uom_Faturamento" "Unidade de Faturamento"
+	, T0."U_Vendedor" "Vendedor"
+	, T0."U_Observacao" "Observação"
+	, T0."U_Frete" "Frete"
+	, T0."U_CondicaoPagamento" "Condição de Pagamento"
+	, T0."U_FormaPagamento" "Forma de Pagamento"
+	, T0."U_Apoio" "Apoio"
+	, T0."U_ClienteRemessa" "Cliente Remessa"
+	, (SELECT "CardName" FROM OCRD WHERE "CardCode" = T0."U_ClienteRemessa") "Nome Remessa"
+	, T0."U_Transportadora" "Transportadora"
+	, (SELECT "CardName" FROM OCRD WHERE "CardCode" = T0."U_Transportadora") "Nome Tranportadora"
+--	, T1."U_ItemCode" "Ferramenta"
+--	, T1."U_ItemName" "Descrição Ferramenta"
+--	, T1."U_Liga" "Liga"
+--	, T1."U_Tempera" "Tempera"
+--	, T1."U_Comprimento" "Comprimento"
+--	, T1."U_Acabamento" "Acabamento"
+	, (SELECT MAX("ItemName") from oitm where "ItemCode" = (SELECT MAX("U_Acabamento") FROM "@SPS_PRVD_LIN" WHERE "DocEntry" = T0."DocEntry"))"Descrição acabamento"
+--	, T1."U_Classe" "Classe"
+--	, T1."U_Usinagem" "Usinagem"
+--	, T1."U_Quantidade" "Quantidade PC"
+--	, T1."U_Peso" "Quantidade Kg"
+--	, T1."U_PrecoAluminio" "PrecoAluminio"
+--	, T1."U_PrecoAcabamento" "Preco Acabamento"
+--	, T1."U_Preco" "Preco"
+--	, T1."U_Total" "Total"
+--	, T1."U_NewItemCode" "Item Novo"
+--	, T1."U_NewItemName" "Descrição item novo"
+	, (SELECT MAX("U_ShipDate") FROM "@SPS_PRVD_LIN" WHERE "DocEntry" = T0."DocEntry") AS "Data de entrega"
+--	, T1."U_ShipDate" "Data de entrega"
+--	, T1."LineId"
+	, T6."PymntGroup" "Descrição Condição de pgto"
+	, (SELECT CASE WHEN IFNULL(A1."TaxId0",'') = '' THEN A1."TaxId4" ELSE A1."TaxId0" END FROM CRD7 A1 WHERE A1."CardCode" = T3."CardCode" AND A1."Address" = '') "CPF/CNPJ"
+--	, (SELECT CASE WHEN "U_SPS_PRVD_Giro" = 'Y' THEN 'GIRO' WHEN "U_SPS_PRVD_Giro" = 'N' THEN '' END FROM OITM WHERE "ItemCode" = T1."U_ItemCode") "GIRO" 
+	, T2."SlpName" "NomeVendedor"
+--	, T99."BitmapPath"||T0."U_CardCode"||'.bmp' "ImagemCliente"
+--	, T99."BitmapPath"||T0."U_ClienteRemessa"||'.jpg' "ImagemObra"
+--	, 'Orçamento '||T5."State"||REPLACE(TO_VARCHAR(IFNULL(T0."U_DocDate", T7."OpenDate"), 'YYYY-MM'),'-','')||'-B'||T0."DocNum"||'R00' "Nome do Orçamento"
+	, T7."U_SPS_LogoCliente" AS "ImagemCliente" 
+	, T7."U_SPS_ImagemObra"  AS "ImagemObra"
+	, T7."U_SPS_Obra" 		 AS "Nome da Obra"
+	, T7."U_SPS_Nome" 		 AS "Nome do Orçamento"
+	, T3."FirstName"||' '||T3."MiddleName" "Contato"
+	, ADD_DAYS(ADD_MONTHS(IFNULL(T0."U_DocDate", T7."OpenDate"), 1), EXTRACT(DAY FROM IFNULL(T0."U_DocDate", T7."OpenDate")) * -1) "Validade"
+FROM
+	"@SPS_PRVD_CAB" T0
+	--LEFT  JOIN "@SPS_PRVD_LIN" T1 ON T0."DocEntry" = T1."DocEntry"
+	LEFT  JOIN OSLP T2 ON T0."U_Vendedor" = T2."SlpCode"
+	LEFT  JOIN OADP T99 ON 1=1
+	LEFT  JOIN OCPR T3 ON T0."U_CardCode" = T3."CardCode"
+	LEFT  JOIN OCRD T4 ON T0."U_CardCode" = T4."CardCode"
+	LEFT  JOIN CRD1 T5 ON T0."U_CardCode" = T5."CardCode" AND T5."AdresType" = 'S'
+	LEFT  JOIN OCTG T6 ON T6."GroupNum" = T0."U_CondicaoPagamento"
+	INNER JOIN OOPR T7 ON T0."U_SPS_OpprId" = T7."OpprId" 
+
+WHERE 
+	T0."DocEntry" = :DocKey; 
+
+END;
+
+
+--SELECT * FROM "@SPS_PRVD_CAB"
+--SELECT * FROM OOPR
