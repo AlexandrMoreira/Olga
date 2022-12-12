@@ -1,37 +1,48 @@
 -- Liberação p/ Produção -- 
 
 CREATE PROCEDURE SP_SPS_LAYOUT_LIB_PROD (
-
-IN DocKey int
-
+acabamento NVARCHAR (50)
 )
 
 AS
 BEGIN
 
+
 SELECT 
 
 	T0."CardName" AS "NomeDoCliente",
 	T0."CardCode" AS "CódCliente",
-	T0."CardType" AS "TipoPN",
 	T1."U_DocDate" AS "Data",
+	DAYS_BETWEEN(T1."U_DocDate",current_date) AS "Dias",
 	T1."U_Acabamento" AS "Acabamento",
-	--T1."U_Status" AS "Status",-
+	CAST(T4."MENGE" AS DECIMAL(26,2)) ||' Kg' AS "Peso",
+	T5."SlpName" AS "Vendedor",
+	--T1."U_SolidoPc" + T1."U_TuboPc" + T1."U_ChapaPc" AS "U_PesoTotal",--
+	--T1."U_Status" AS "Status",--
+	--T4."BELNR_ID" AS "NºOP",--
+	--T4."BELPOS_ID" AS "Lote",--
+	Z1."Descr" "Status",
+	'nº '|| T4."BELNR_ID"  ||'/'||T4."BELPOS_ID" AS "LOTE",
+	CAST (T1."U_TuboQty" + T1."U_ChapaQty" + T1."U_SolidoQty" AS DECIMAL(26,2)) ||' Kg' AS "PesoTotal",
+	CAST (T1."U_PecaQty" AS DECIMAL (26,0)) || ' Pçs' AS "QtdePeças"
 	
-	CASE 
-	WHEN T1."U_Status" = '6' THEN 'Produção'
-	ELSE 'Não Liberado'
-	END AS "Status"
+
 	
 	
 FROM OCRD T0
-
 INNER JOIN "@SPS_RMIND_CAB" T1 ON T0."CardCode" = T1."U_CardCode"
-
+--INNER JOIN "@SPS_RMIND_PERFIL" T2 ON T1."U_Acabamento" = T2."U_Acabamento"--
+INNER JOIN CUFD Z0 ON Z0."TableID" =  '@SPS_RMIND_CAB' and Z0."AliasID" = 'Status'
+INNER JOIN UFD1 Z1 ON Z1."FieldID" = Z0."FieldID" and Z1."TableID" = Z0."TableID" and Z1."FldValue"=T1."U_Status"
+INNER JOIN BEAS_FTHAUPT T3 ON T1."DocEntry" = T3."UDF1"
+INNER JOIN BEAS_FTPOS T4 ON T4."BELNR_ID" = T3."BELNR_ID"
+INNER JOIN OSLP T5 ON T1."U_SlpName" = T5."SlpName"
 	
-WHERE T0."CardType" = 'C' AND T1."DocEntry" = :DocKey
+	
+	
+WHERE T0."CardType" = 'C' AND T1."U_Status" = '6' AND
+(T1."U_Acabamento" = :acabamento OR :acabamento = '*')
 
 ORDER BY T1."U_DocDate" ASC;
 
 END;
-
