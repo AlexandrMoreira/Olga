@@ -1,0 +1,99 @@
+-- ETIQUETA DE PRODUÇÃO --
+
+
+
+CREATE PROCEDURE SPS_ETIQUETA_PRODUCAO_ACABAMENTO(
+	belnrid int,
+	belposid int,
+	etiquetas int,
+	quantidade int
+)
+AS
+BEGIN
+	/*
+	
+	DECLARE belnrid int = 155;
+	DECLARE belposid int = 40;
+	DECLARE etiquetas int :=1;
+	DECLARE quantidade int := 4;
+	*/
+	DECLARE caminho varchar(200) := '\\srvolga\B1_SHF\7-IMAGENS\';
+	DECLARE proxEtiqueta int;
+
+	SELECT IFNULL(NULLIF("UDF5",''),0) into proxEtiqueta 
+	FROM BEAS_FTPOS 
+	WHERE BELNR_ID = :belnrid
+		AND BELPOS_ID = :belposid
+		;
+	
+	etiqList=SELECT
+		T5."ItemName" as "TITULO ACABAMENTO"
+		,(CASE WHEN :etiquetas >1 THEN '1' WHEN :etiquetas = 1 THEN '2' END) as "TIPO DA ETIQUETA"
+		, :caminho ||SUBSTR_BEFORE (T2."ItemCode",'.')||'.bmp' as "CAMINHO DA IMAGEM" 
+		, T3."CardName" as "NOME CLIENTE"
+		, T3."DocNum"  as "NUMERO DO PEDIDO"
+		, T4."ItemCode" as "CÓDIGO DO ITEM"
+		, T4."ItemName" as "DESCRICAO DO ITEM"
+		, 'LOTE: '||T0."BELNR_ID"||'/'||T0."BELPOS_ID" as "NUMERO DO LOTE"
+		, 'PESO: '||REPLACE(TO_VARCHAR(CAST(ROUND(T4."SWeight1"*:quantidade,2) AS DECIMAL(28,2))),'.',',')||' Kg' as "PESO DO ITEM"
+		, 'AMARRADO: '||CAST(GENERATED_PERIOD_END||'/'||:etiquetas as varchar(50))as "AMARRADO"
+		, LPAD(T0.BELNR_ID,8,'0')||LPAD(T2."DocEntry",8,'0')||LPAD(T2."LineNum",3,'0')||LPAD(:quantidade,4,'0')||LPAD((GENERATED_PERIOD_END+proxEtiqueta),3,'0') as "QRCODE"
+		, 'QTDE: '||TO_VARCHAR(:quantidade)||' PC' as "QUANTIDADE DE PECAS"
+		, SUBSTR_REGEXPR( '^.+?\..+?\..+?\..+?\.(.+?)$' IN T2."ItemCode" GROUP 1)as "COD. ACABAMENTO"
+		, TO_VARCHAR(:quantidade) "Quantity"
+		, T4."ItemCode"
+		, T5."ItemCode" "ItemCode2"
+		, GENERATED_PERIOD_END+proxEtiqueta "UNIQUE"
+	FROM BEAS_FTPOS T0
+		LEFT JOIN BEAS_FTHAUPT T1 ON T1."BELNR_ID"=T0."BELNR_ID"
+		LEFT JOIN RDR1 T2 ON T2."DocEntry"=T0."DocEntry" and T2."LineNum"=T0."BaseLine"
+		LEFT JOIN ORDR T3 ON T3."DocEntry"=T2."DocEntry"
+		LEFT JOIN OITM T4 ON T4."ItemCode" = T2."ItemCode"
+		LEFT JOIN OITM T5 ON T5."ItemCode" = SUBSTR_REGEXPR( '^.+?\..+?\..+?\..+?\.(.+?)$' IN T2."ItemCode" GROUP 1)
+		JOIN SERIES_GENERATE_INTEGER(1,0,:etiquetas) oN  1=1 
+	WHERE T0.BELNR_ID = :belnrid
+		AND T0.BELPOS_ID = :belposid
+		AND T1."TYP" in ('MTO')
+	UNION ALL
+	SELECT
+		T5."ItemName" as "TITULO ACABAMENTO"
+		,(CASE WHEN :etiquetas >1 THEN '1' WHEN :etiquetas = 1 THEN '2' END) as "TIPO DA ETIQUETA"
+		, :caminho ||R4."U_Perfil"||'.bmp' as "CAMINHO DA IMAGEM" 
+		, T3."CardName" as "NOME CLIENTE"
+		, T3."DocNum"  as "NUMERO DO PEDIDO"
+		, T4."ItemCode" as "CÓDIGO DO ITEM"
+		, T0."ItemName" as "DESCRICAO DO ITEM"
+		, 'LOTE: '||T0."BELNR_ID"||'/'||T0."BELPOS_ID" as "NUMERO DO LOTE"
+		, 'PESO: '||REPLACE(TO_VARCHAR(CAST(ROUND((R4."U_QtdeKG"/R4."U_QtdePC")*:quantidade,2) AS DECIMAL(28,2))),'.',',')||' Kg' as "PESO DO ITEM"
+		, 'AMARRADO: '||CAST(GENERATED_PERIOD_END||'/'||:etiquetas as varchar(50))as "AMARRADO"
+		, LPAD(T0.BELNR_ID,8,'0')||LPAD(T2."DocEntry",8,'0')||LPAD(T2."LineNum",3,'0')||LPAD(:quantidade,4,'0')||LPAD((GENERATED_PERIOD_END+proxEtiqueta),3,'0') as "QRCODE"
+		, 'QTDE: '||TO_VARCHAR(:quantidade)||' PC' as "QUANTIDADE DE PECAS"
+		, T0.UDF10 as "COD. ACABAMENTO"
+		, TO_VARCHAR(:quantidade) "Quantity"
+		, T4."ItemCode"
+		, T5."ItemCode" "ItemCode2"
+		, GENERATED_PERIOD_END+proxEtiqueta "UNIQUE"
+	FROM BEAS_FTPOS T0
+		LEFT JOIN BEAS_FTHAUPT T1 ON T1."BELNR_ID"=T0."BELNR_ID"
+		LEFT JOIN "@SPS_RMIND_PERFIL" R4 ON R4."DocEntry" = T1."UDF1" and TO_VARCHAR(R4."LineId") = TO_VARCHAR(T0."UDF1")
+		LEFT JOIN ORDR R1 ON 
+			R1."U_SPS_RmInd_Entry"=T1."UDF1" and R1."CANCELED"='N'
+		LEFT JOIN RDR1 T2 ON 
+			T2."DocEntry"=R1."DocEntry" and T2."LineNum"=T0."UDF1"	
+		LEFT JOIN ORDR T3 ON T3."DocEntry"=T2."DocEntry"
+		LEFT JOIN OITM T4 ON T4."ItemCode" = T2."ItemCode"
+		LEFT JOIN OITM T5 ON T5."ItemCode" = T0.UDF10
+		JOIN SERIES_GENERATE_INTEGER(1,0,:etiquetas) oN  1=1 
+	WHERE T0.BELNR_ID = :belnrid
+		AND T0.BELPOS_ID = :belposid
+		AND T1."TYP" in ('INDUSTRIALIZACAO')	
+	;
+	
+	UPDATE BEAS_FTPOS SET UDF5 = (SELECT MAX(UNIQUE) FROM :etiqList)
+	WHERE BELNR_ID = :belnrid
+		AND BELPOS_ID = :belposid
+	;
+	
+	SELECT * FROM :etiqList;
+
+END;
