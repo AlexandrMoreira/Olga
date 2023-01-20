@@ -1,0 +1,59 @@
+-- CONSULTA FORMATADA - MTO --
+
+
+SELECT 
+
+	T0."KNDNAME" AS "Cliente",
+	T0."BELNR_ID" AS "NºDoc",
+	T0."AUFTRAG" AS "OP",
+	T1."BELPOS_ID" AS "Posição",
+	--T2."BUCHNR_ID",
+	T1."ItemName" AS "Item",
+	T0."BELDAT" AS "Data_Abertura",
+	T0."LFGDAT" AS "Data_Encerramento",
+	T5."SlpName" AS "Vendedor",
+	CAST(ROUND((T6."SWeight1"),4) AS decimal (28,4)) || 'Kg' AS "Peso",
+	CAST(ROUND((T1."MENGE_VERBRAUCH" * T6."SWeight1"),3) AS DECIMAL (28,4)) || 'Kg' AS "Peso_Total",
+	SUBSTR_REGEXPR( '(.+?)\.' IN T1."ItemCode" OCCURRENCE 1 GROUP 1) AS "Ferramenta",
+	SUBSTR_REGEXPR( '^.+?\..+?\..+?\..+?\.(.+?)$' IN T1."ItemCode" GROUP 1) AS "Acabamento",
+	
+	
+	
+	--ROUND(T1."MENGE_VERBRAUCH",2) AS "QtdeProgramada",
+	--T0."APSSTATUS" AS "Status",--
+
+	TO_VARCHAR(CEILING(T1."MENGE_VERBRAUCH")) AS "QtdeProgramada",
+	--ROUND(CAST(T1."MENGE_VERBRAUCH" AS NVARCHAR(10)),2) AS "QtdeProgramada",
+	
+		
+	TO_VARCHAR(ifnull(SUM(T2."MENGE_GUT_RM"),0),0) AS "QtdeOK",
+	TO_VARCHAR(ifnull(SUM(T2."MENGE_SCHLECHT_RM"),0),0) AS "Rejeição",
+	
+CASE 
+	WHEN T0."APSSTATUS" = 1 THEN 'Programado' 
+	WHEN T0."APSSTATUS" = 0 THEN 'Não Programado'
+	WHEN T0."APSSTATUS" is null THEN 'Não Programado'
+END AS "Status"
+
+FROM BEAS_FTHAUPT T0
+
+INNER JOIN BEAS_FTPOS T1 ON T0."BELNR_ID" = T1."BELNR_ID" 
+LEFT JOIN BEAS_ARBZEIT T2 ON T0."BELNR_ID" = T2."BELNR_ID"
+						AND T1."BELPOS_ID" = T2."BELPOS_ID"
+						AND T2."PostInDocEntry" is not null  
+LEFT JOIN BEAS_ARBZEIT_SCRAP T3 ON T2."BUCHNR_ID" = T3."BUCHNR_ID"						
+INNER JOIN OCRD T4 ON T0."KND_ID" = T4."CardCode"
+INNER JOIN OSLP T5 ON T4."SlpCode" = T5."SlpCode"
+INNER JOIN OITM T6 ON T1."ItemCode" = T6."ItemCode"
+
+
+WHERE T0."TYP" IN ('MTO')
+AND T1."ZU_BELPOS_ID" is null
+
+GROUP BY T0."KNDNAME",T0."BELNR_ID",T0."AUFTRAG",T0."BELDAT"
+,T0."LFGDAT",T0."APSSTATUS",T1."MENGE_VERBRAUCH",T1."BELPOS_ID"
+,T1."ItemName",T5."SlpName",T6."U_SPS_PROD_Kilo_por_Metro",T6."SWeight1",T6."SWeight1"
+,T1."MENGE_VERBRAUCH", T1."ItemCode"
+
+
+ORDER BY T0."BELNR_ID", T1."BELPOS_ID"
