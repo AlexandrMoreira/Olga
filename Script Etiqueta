@@ -1,0 +1,37 @@
+
+
+windowevent postopen
+	dw_1.item.op.value=
+	dw_1.item.pos.value=
+	dw_1.item.etiqueta.value=
+	dw_1.item.quantidade.value=
+
+	create=button=text=Gerar Etiqueta,name=etiquetadireto,position=0
+end event
+
+global function dw_master_item_button_etiquetadireto_click
+	Etiqueta()
+end global
+
+global function Etiqueta
+	printobject=openreport=etiquetaProducaoAcabamento.rpt
+	printobject=connectioninfo
+	printobject=setvar=etiquetas=<dw_1.item.etiqueta.value>
+	printobject=setvar=quantidade=<dw_1.item.quantidade.value>
+	printobject=setvar=belnrid=<dw_1.item.op.value>
+	printobject=setvar=belposid=<dw_1.item.pos.value>
+	printobject=parameter
+	printobject=parameter_set
+	printobject=crreport=printout
+	printobject=disconnect
+	//printobject=makrostart=print==100004
+end global
+// DataWindow loaded
+// Created 18.01.2023 18:49:25 from manager2, Station moreira.alexandre
+global function dw_1_load
+// Last change: 18.01.2023 18:55:01 from manager2, Station moreira.alexandre
+dw_1.item.op_t.formatstring=text=Lote (OP),
+dw_1.item.pos_t.formatstring=text=Lote (POS),
+dw_1.item.etiqueta_t.formatstring=text=Quant. Etiqueta,
+dw_1.item.quantidade_t.formatstring=text=Quant. Itens,color=0,
+end global
