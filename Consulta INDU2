@@ -1,0 +1,64 @@
+-- CONSULTA FORMATADA - INDUSTRIALIZAÇÃO --
+
+
+
+SELECT 
+
+	T0."DocNum" AS "NºRomaneio",
+	T0."U_CardName" AS "Cliente",
+	T0."U_Acabamento" AS "Acabamento",	
+	T3."ItemName" AS "Item",
+	T0."U_Serial" AS "NotaFiscal",
+	T0."U_SlpName" AS "Vendedor",
+	T0."U_TipoRomaneio" AS "TipoMaterial",
+	T0."U_Comments" AS "Era_Lote",
+
+	
+	
+	---- QUANTIDADES ----
+
+	CAST (ROUND((T0."U_SolidoQty"),2) AS DECIMAL (28,2)) || 'Kg' AS "Sólido(Kg)",
+	CAST (ROUND((T0."U_TuboQty"),2) AS DECIMAL (28,2)) || 'Kg' AS "Tubo(Kg)",
+	CAST (ROUND((T0."U_ChapaQty"),2) AS DECIMAL (28,2)) || 'Kg' AS "Chapa(Kg)",
+	CAST (ROUND((T0."U_PecaQty"),2) AS DECIMAL (28,2)) || ' pçs' AS "Peça(Un)",
+	
+	---- UTILIZADO ----
+	
+	CAST (ROUND((T0."U_SolidoPc"),2) AS DECIMAL (28,2)) || 'Kg' AS "Sólido_Utilizado",
+	CAST (ROUND((T0."U_TuboPc"),2) AS DECIMAL (28,2)) || 'Kg' AS "Tubo_Utilizado",
+	CAST (ROUND((T0."U_ChapaPc"),2) AS DECIMAL (28,2)) || 'Kg' AS "Chapa_Utilizado",
+	CAST (ROUND((T0."U_PecaPc"),2) AS DECIMAL (28,2)) || ' pçs' AS "Peça_Utilizado",	
+	
+	---- SALDO ---
+
+	CAST(ROUND((T0."U_SolidoQty" - T0."U_SolidoPc"),2) AS DECIMAL (28,2)) || 'Kg' AS "Sólido_Saldo",
+	CAST(ROUND((T0."U_TuboQty" - T0."U_TuboPc"),2) AS DECIMAL (28,2)) || 'Kg' AS "Tubo_Saldo",
+	CAST(ROUND((T0."U_ChapaQty" - T0."U_ChapaPc"),2) AS DECIMAL (28,2)) || 'Kg' AS "Chapa_Saldo",
+	CAST(ROUND((T0."U_PecaQty" - T0."U_PecaPc"),2) AS DECIMAL (28,2)) || ' pçs' AS "Peça_Saldo",
+	
+	--------
+	
+	T0."U_Origem" AS "Origem",
+	T0."U_DocDate" AS "DataLançamento",
+	T0."U_Previsao" AS "DataPrevista",
+	Z1."Descr" AS "StatusAtual",
+	T2."BELNR_ID" AS "OP",
+	T3."BELPOS_ID" AS "Posição",
+
+
+CASE 
+	WHEN T2."BELNR_ID" is not null THEN '<--- OP/POS'
+	WHEN T2."BELNR_ID" is null THEN 'Sem OP criada' 
+END AS "Com/Sem OP"
+
+				
+FROM "@SPS_RMIND_CAB" T0
+
+INNER JOIN CUFD Z0 ON Z0."TableID" =  '@SPS_RMIND_CAB' AND Z0."AliasID" = 'Status'
+INNER JOIN UFD1 Z1 ON Z1."FieldID" = Z0."FieldID" AND Z1."TableID" = Z0."TableID" and Z1."FldValue"=T0."U_Status"
+LEFT JOIN BEAS_FTHAUPT T2 ON T0."DocEntry" = T2."UDF1"
+LEFT JOIN BEAS_FTPOS T3 ON T2."BELNR_ID" = T3."BELNR_ID" 
+
+
+
+ORDER BY T0."DocNum", T3."BELPOS_ID"
