@@ -1,0 +1,206 @@
+CREATE PROCEDURE BEAS_FERRAMENTAS()
+AS 
+BEGIN
+	
+	--# Preencher MatchCode automaticamente
+	UPDATE T0 SET 
+		T0."U_beas_match"=LEFT(T1."U_SPS_PROD_CodFerMkt",50)
+	FROM OITM T0
+		LEFT JOIN OITM T1 ON T1."ItemCode"=SUBSTR_BEFORE(T0."ItemCode",'.') 
+	WHERE T1."U_SPS_PROD_GiroABC"  is not null and 
+		T1."U_SPS_PROD_CodFerMkt" is not null
+	;	
+	
+	--CALL BEAS_FERRAMENTAS
+	--CADASTRA AS FERRAMENTAS (ATIVO) Não existentes do SAP
+	cadastrar=SELECT 
+		T0."ItemCode"
+		,T0."ItemName"
+		,T1.WKZ_ID
+		,"U_SPS_PROD_Kilo_por_Metro"	
+		,"U_SPS_PROD_AreaPerfil"
+		,"U_SPS_PROD_QtdFuros"
+		,"U_SPS_PROD_KmNominal"
+		,"U_SPS_PROD_CodMercado"
+		,"U_SPS_PROD_GrupoFerramenta"
+		,"U_SPS_PROD_UsoProducao"
+		,"U_SPS_PROD_VidaUtil"
+		,"U_SPS_PROD_Status" 
+	FROM OITM T0
+		LEFT JOIN BEAS_WKZ T1 ON T1."WKZ_ID"=T0."ItemCode"
+	WHERE T0."ItemType"='F'
+		and T1.WKZ_ID is null
+		and T0."U_SPS_PRVD_Ferramenta"='Y'
+	;
+	
+	INSERT INTO BEAS_WKZ
+	SELECT
+		T1."ItemCode" WKZ_ID
+		,T1."ItemName" "BEZ"
+		,"ZNR","LIEF_ID"
+		,"CardCode","KST"
+		,"Project"
+		,"ZUSTAND","BEMERKUNG"
+		,"APSVIEW","WKZTYP_ID"
+		,"KAPACHECKLIMIT","LIEGEZEIT"
+		,"LIEGEZEIT_TYP","KAPAPLANUNG"
+		,"BESTIMMT_ZEIT","INSTKST"
+		,"INSTKSTJE","ZEITKSTGK"
+		,"ZEITKSTVK","ZEITKSTZEITJE"
+		,"ART",CURRENT_TIMESTAMP "DATUM","FERTIGER"
+		,"LAGO_ID","LPLATZ_ID","MENGE"
+		,"KOSTENJE","BETRIEBSDAUER"
+		,"BETRIEBSZEIT","KAUFBEMERKUNG"
+		,"WARTUNG_MAX","WARTUNG_LETZTE"
+		,"WARTUNG_ZAEHLER","WARTUNG_INFO"
+		,"CHOOSEABLE","ZAEHLERSTAND","ZAEHLER_VOM"
+		,"KTIMETYPE_ID","WTIMETYPE_ID"
+		,T0."ItemCode","AKTIV","GESPERRT"
+		,"GESPERRT_BIS","GESPERRT_GRUND"
+		,"DOCUMENTS","NUTZEN","BILD1"
+		,"BILD2","BILD3"
+		,"UDF1","UDF2","UDF3","UDF4"
+		,CURRENT_TIMESTAMP "ERFTSTAMP"
+		,'dba' "ERFUSER"
+		,CURRENT_TIMESTAMP "ANDTSTAMP"
+		,'dba' "ANDUSER"
+	FROM BEAS_WKZ T0, :cadastrar T1
+	WHERE T0.WKZ_ID = 'MODELO'
+	;
+	
+	--ANALISA STATUS DAS FERRAMENTAS
+	analiseferramenta=SELECT
+		T0."ItemCode"
+		,T0."U_SPS_PROD_Status" "Status"
+		,T0."U_SPS_PROD_StatusManual" "StatusManual"
+		,T0."U_SPS_PROD_MotivoStatus" "MotivoStatus"
+		,(SELECT STRING_AGG(A1."BELNR_ID"||'/'||A0."BELPOS_ID",'') FROM BEAS_FTAPL_WKZ A0
+			INNER JOIN BEAS_FTPOS A1 ON A1.BELNR_ID = A0.BELNR_ID and A1.BELPOS_ID = A0.BELPOS_ID
+			WHERE A1.ABGKZ = 'N'
+				and A0.WKZ_ID = T1.WKZ_ID
+				) "AplicadoProducao"
+		,CASE WHEN T0."U_SPS_PROD_UsoAtual" >= T0."U_SPS_PROD_LimiteNitretacao" THEN 1 ELSE 0 END "Indisponivel"
+		,(SELECT STRING_AGG('NF '||A3."Serial",',') FROM RPD1 A0 INNER JOIN ORPD A3 ON A3."DocEntry"=A0."DocEntry"
+			WHERE A3."CANCELED"='N'
+			and TO_TIMESTAMP(TO_VARCHAR(A3."DocDate",'dd/MM/yyyy')||' '||TO_VARCHAR(TO_TIME(LPAD(A3."CreateTS",6,'0'),'HH24miss'),'HH24:mi:ss'),'dd/MM/yyyy HH24:mi:ss') >= TO_DATE(TO_TIMESTAMP(T0."U_SPS_PROD_DataStatus",'dd/MM/yyyy HH24:mi:ss'))
+			and A0."ItemCode"=T1.WKZ_ID
+			and not exists (SELECT * FROM PDN1 A1 INNER JOIN OPDN A2 ON A2."DocEntry"=A1."DocEntry" 
+								WHERE  A2."CANCELED"='N'
+								and A1."BaseEntry"=A0."DocEntry"
+								and A1."BaseType"=A0."ObjType"
+								) 
+							) "nitretacao"
+		,(SELECT COUNT(*) FROM RPD1 A0 INNER JOIN ORPD A3 ON A3."DocEntry"=A0."DocEntry"
+			WHERE A3."CANCELED"='N'
+			and TO_TIMESTAMP(TO_VARCHAR(A3."DocDate",'dd/MM/yyyy')||' '||TO_VARCHAR(TO_TIME(LPAD(A3."CreateTS",6,'0'),'HH24miss'),'HH24:mi:ss'),'dd/MM/yyyy HH24:mi:ss') >= TO_DATE(TO_TIMESTAMP(T0."U_SPS_PROD_DataStatus",'dd/MM/yyyy HH24:mi:ss'))
+			and A0."ItemCode"=T1.WKZ_ID
+			and exists (SELECT * FROM PDN1 A1 INNER JOIN OPDN A2 ON A2."DocEntry"=A1."DocEntry" 
+								WHERE  A2."CANCELED"='N'
+								and A1."BaseEntry"=A0."DocEntry"
+								and A1."BaseType"=A0."ObjType"	
+								and TO_TIMESTAMP(TO_VARCHAR(A2."DocDate",'dd/MM/yyyy')||' '||TO_VARCHAR(TO_TIME(LPAD(A2."CreateTS",6,'0'),'HH24miss'),'HH24:mi:ss'),'dd/MM/yyyy HH24:mi:ss') >= TO_TIMESTAMP(T0."U_SPS_PROD_DataStatus",'dd/MM/yyyy HH24:mi:ss')
+							) 
+						) "RetornoNitretacao"
+		,TO_TIMESTAMP(T0."U_SPS_PROD_DataStatus",'dd/MM/yyyy HH24:mi:ss') "DataStatus"
+		,CASE T0."U_SPS_PROD_Nitretacao"+1
+			WHEN 1 THEN 1500
+			WHEN 2 THEN 3000
+			WHEN 3 THEN 4000
+			ELSE 4000
+			END "LimiteNitretacao"
+		,T0."U_SPS_PROD_Nitretacao"+1 "Nitretacao"
+		,IFNULL(T0."U_SPS_PROD_UsoProducao",0) "UsoProducao"
+		,IFNULL(T0."U_SPS_PROD_UsoAtual",0) "UsoAtual"
+		,(SELECT 
+				SUM(A1.MENGE_VERBRAUCH*A0.MENGE_GUT) "QTY"
+			FROM BEAS_ARBZEIT A0
+				INNER JOIN BEAS_FTSTL A1 ON A1."BELNR_ID"=A0."BELNR_ID" AND A1."BELPOS_ID"=A0."BELPOS_ID"
+				INNER JOIN BEAS_FTAPL A2 ON A2."BELNR_ID"=A0."BELNR_ID" AND A2."BELPOS_ID"=A0."BELPOS_ID" and A2."POS_ID"=A0."POS_ID"
+				INNER JOIN BEAS_FTAPL_WKZ A3 ON A3."BELNR_ID"=A2."BELNR_ID" AND A3."BELPOS_ID"=A2."BELPOS_ID" and A3."POS_ID"=A2."POS_ID" and A3.AKTIV=1
+			WHERE A0.ERFTSTAMP > TO_TIMESTAMP(T0."U_SPS_PROD_DataStatus",'dd/MM/yyyy HH24:mi:ss')
+				and A0."PostOutDocEntry" is not null
+				and A3."WKZ_ID"=T0."ItemCode"
+			) "Apontamento"
+		,CASE WHEN
+			-ROUND((1-(T0."U_SPS_PROD_Kilo_por_Metro"/T0."U_SPS_PROD_KmNominal"))*100,2)
+			> T0."U_SPS_PROD_AceiteFerramenta"
+		 	THEN 1 ELSE 
+		 	0
+		 	END "Aceite"
+	FROM OITM T0
+		INNER JOIN BEAS_WKZ T1 ON T1."WKZ_ID"=T0."ItemCode"
+	WHERE T0."ItemType"='F'
+		and T0."U_SPS_PRVD_Ferramenta"='Y'
+		and T0."AsstStatus" not in ('I')
+	;
+
+	statusferramenta=SELECT 
+		"ItemCode"
+		,"Status" "StatusAnterior"
+		,CASE 
+			WHEN "StatusManual" <> '0' THEN "StatusManual"
+			WHEN "RetornoNitretacao">0 THEN '2'
+			WHEN "nitretacao" is not null THEN '3'
+			WHEN "Aceite" = 1 THEN '1'
+			WHEN "Indisponivel"=1 THEN '1'
+			WHEN "AplicadoProducao" is not null THEN '4'
+			ELSE '2'
+			END "StatusNovo"
+		,CASE 
+			WHEN "StatusManual" <> '0' THEN "MotivoStatus"
+			WHEN "RetornoNitretacao">0 THEN ''
+			WHEN "nitretacao" is not null THEN 'Enviado para Nitretação '||"nitretacao"
+			WHEN "Aceite" = 1 THEN 'Percentual de Aceite Atingido'
+			WHEN "Indisponivel"=1 THEN 'Limite de Uso Atingido'
+			WHEN ifnull("Apontamento",0) > 0 THEN 'Aplicado em Produção '||"AplicadoProducao"||' - '||'Apontamento de '||CAST(ROUND("Apontamento",3) as decimal(28,3))
+			WHEN "AplicadoProducao" is not null THEN 'Aplicado em Produção '||"AplicadoProducao"
+			ELSE ''
+			END "Motivo"
+		,"RetornoNitretacao"
+		,"LimiteNitretacao"
+		,"Nitretacao"
+		,"Apontamento"
+		,CASE WHEN ifnull("Apontamento",0) > 0 THEN ifnull("UsoAtual",0)+"Apontamento" ELSE "UsoAtual" END "UsoAtual" 
+		,CASE WHEN ifnull("Apontamento",0) > 0 THEN ifnull("UsoProducao",0)+"Apontamento" ELSE "UsoProducao" END "UsoProducao"
+	FROM :analiseferramenta;
+
+	atualizarferramenta=SELECT
+		*
+		,current_date "Data"
+		,TO_INT(TO_VARCHAR(current_time,'HH24mi')) "Hora"
+	FROM :statusferramenta 
+	WHERE ("StatusAnterior"<>"StatusNovo")
+		or 
+		(ifnull("Apontamento",0) > 0)
+	;
+	
+	BEGIN
+		DECLARE newcode int;
+		SELECT TO_INT(IFNULL(MAX("Code"),0)) into newcode FROM "@SPS_HIST_FER";
+		
+		UPDATE T0 SET 
+			T0."U_SPS_PROD_Status"=T1."StatusNovo"
+			,T0."U_SPS_PROD_MotivoStatus"=T1."Motivo"
+			,T0."U_SPS_PROD_LimiteNitretacao"=CASE WHEN T1."RetornoNitretacao">0 THEN T1."LimiteNitretacao" ELSE T0."U_SPS_PROD_LimiteNitretacao" END
+			,T0."U_SPS_PROD_Nitretacao"=CASE WHEN T1."RetornoNitretacao">0 THEN T1."Nitretacao" ELSE T0."U_SPS_PROD_Nitretacao" END
+			,T0."U_SPS_PROD_UsoAtual"=CASE WHEN T1."RetornoNitretacao">0 THEN 0 ELSE "UsoAtual" END
+			,T0."U_SPS_PROD_DataStatus"=TO_VARCHAR(current_timestamp,'dd/MM/yyyy HH24:mi:ss')
+			,T0."U_SPS_PROD_UsoProducao"="UsoProducao"
+		FROM OITM T0
+			INNER JOIN :atualizarferramenta T1 ON T1."ItemCode"=T0."ItemCode"
+		;
+		
+		INSERT INTO "@SPS_HIST_FER"
+		SELECT 
+			LPAD(:newcode+ROW_NUMBER() OVER(ORDER BY "ItemCode"),9,'0') "Code" 
+			,LPAD(:newcode+ROW_NUMBER() OVER(ORDER BY "ItemCode"),9,'0') "Name" 
+			,"ItemCode"
+			,"StatusAnterior"
+			,"StatusNovo"
+			,"Motivo"
+			,"Data"
+			,"Hora"
+		FROM :atualizarferramenta;
+	END;
+	
+END;
