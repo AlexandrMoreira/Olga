@@ -1,0 +1,28 @@
+---- CONSULTA FORMATADA -> Alerta - Ferramenta Obsoleta ----
+
+
+
+--DO 
+
+BEGIN
+alerta = 
+SELECT 
+	--"Code", 
+	"U_ItemCode" "Ferramenta", 
+	--"U_StatusNovo",
+	--"U_Data",
+	--"U_Hora",
+		
+	CASE WHEN "U_StatusNovo" = '9' THEN 'Ferramenta Obsoleta'
+	END AS "Status Ferramenta",
+	
+	TO_VARCHAR("U_Data", 'dd/MM/yyyy')||' / '||TO_VARCHAR(TO_TIME(TO_VARCHAR(LPAD("U_Hora",4,'0')), 'HH24mi'),'HH24:mi') "Data e Hora"
+	
+FROM "@SPS_HIST_FER"
+WHERE "U_StatusNovo" = '9' AND IFNULL ("U_StatusEnvio", 'N') = ''
+GROUP BY "U_ItemCode", "Code", "U_StatusNovo", "U_Data", "U_Hora"
+
+UPDATE "@SPS_HIST_FER" SET "U_StatusEnvio" = 'Y' WHERE "Code" in (SELECT "Code" FROM :alerta);
+SELECT "Ferramenta", "Status Ferramenta", "Data e Hora" FROM :alerta;
+
+END;
